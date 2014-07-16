@@ -1,0 +1,29 @@
+{
+  "name"           : "cubesensors-cloud"
+, "version"        : "0.0.1"
+, "description"    : "A node.js module to interface with the Cubesensors cloud API"
+, "author"         : {
+    "name"         : "Marshall Rose"
+  , "email"        : "mrose17@gmail.com"
+  }
+, "repository"     : {
+    "type"         : "git"
+  , "url"          : "https://github.com/TheThingSystem/node-cubesensors-cloud.git"
+  } 
+, "bugs"           : {
+    "url"          : "https://github.com/TheThingSystem/node-cubesensors-cloud/issues"
+  }
+, "dependencies"   : {
+    "moira"        : "1.0.3"
+  , "node-uuid"    : "1.4.0"
+  , "oauth"        : "~0.9.11"
+  , "portfinder"   : "0.2.1"
+  , "speakeasy"    : "git://github.com/TheThingSystem/speakeasy.git"
+  }
+, "keywords"       : [ "CubeSensors" ]
+, "main"           : "./cubesensors-cloud.js"
+, "engines"        : {
+    "node"         : ">=0.8"
+  }
+, "readmeFilename" : "README.md"
+}
