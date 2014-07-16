@@ -167,7 +167,7 @@ CubeSensorsAPI.prototype.getDeviceHistory = function(deviceID, starting, ending,
 };
 
 var normalizeState = function(fields, state) {
-  var i, prop, result;
+  var i, prop, result, value;
 
   result = {};
 
@@ -175,8 +175,15 @@ var normalizeState = function(fields, state) {
   if (i > state.length) i = state.length;
   for (; i >= 0; i--) {
     prop = fields[i];
-    prop = { time: 'timestamp', temp: 'temperature' }[prop] || prop;
-    result[prop] = state[i];
+    prop = { time: 'lastSample', temp: 'temperature', battery: 'batteryLevel' }[prop] || prop;
+
+    value = state[i];
+    if (prop === 'lastSample') {
+      value = new Date(state[i]).getTime();
+      if (isNaN(value)) value = state[i];
+    }
+
+    result[prop] = value;
   }
 
   return result;
@@ -220,8 +227,11 @@ CubeSensorsAPI.prototype.invoke = function(method, path, json, callback) {
     return callback(new Error('GET-without-payload supported only by CubeSensors API'), 405);
   }
 
+console.log('>>> invoke ' + self.state.baseURL + '/v1/' + path);
+
   self.oauth2._request(method, self.state.baseURL + '/v1/' + path, 'GET', self.state.oAuthAccessToken,
                        self.state.oAuthAccessTokenSecret, function(oops, body, response) {
+console.log('<<< ' + (response && response.statusCode) + 'oops='+util.inspect(oops, { depth: null })+ ' body='+body);
       var expected = { GET    : [ 200 ]
                      , PUT    : [ 200 ]
                      , POST   : [ 200, 201, 202 ]
