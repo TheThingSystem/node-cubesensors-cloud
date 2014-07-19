@@ -1,22 +1,30 @@
-var CubesensorsAPI = require('./cubesensors-cloud')
+var CubeSensorsAPI = require('./cubeSensors-cloud')
   , util           = require('util')
   ;
 
-var clientKey    = '...'
-  , clientSecret = '...'
-  , clientState
-  ;
+var clientState = { consumerKey       : '...'
+                  , consumerSecret    : '...'
+                  , oAuthToken        : null
+                  , oAuthTokenSecret  : null
+                  , oAuthVerifier     : null
+                  , oAuthAccessToken  : null
+                  , oAuthAccessSecret : null
+              };
 
-
-clientState = { clientKey : clientKey, clientSecret : clientSecret };
-new CubesensorsAPI.CubesensorsAPI(clientState).on('error', function(err) {
+new CubeSensorsAPI.CubeSensorsAPI(clientState).on('error', function(err) {
   console.log('background error: ' + err.message);
-}).authorize(function(err, state) {
+}).authorize(function(err, state, redirectURL) {
   if (!!err) return console.log('authorization failed: ' + err.message);
 
-  clientState = state;
-  console.log('>>> client state');
-  console.log(util.inspect(state, { depth: null }));
+  if (!!state) {
+    console.log('>>> please update clientState above to contain these parameters:');
+    console.log(util.inspect(state, { depth: null }));
+  }
+  if (!!redirectURL) {
+    console.log('redirect user to ' + redirectURL);
+    console.log('upon success, enter the code from the browser as the oAuthVerifier parameter above');
+    process.exit(0);
+  }
 
   this.getDevices(function(err, devices) {
     var device, i;
@@ -43,16 +51,9 @@ new CubesensorsAPI.CubesensorsAPI(clientState).on('error', function(err) {
 
     var historycb = function(device) {
       return function(err, history) {
-        var i, state;
-
         if (!!err) return console.log('getDeviceHistory ' + device.uid + ' failed: ' + err.message);
 
-        console.log('>>> device ' + device.name + ' (' + device.uid + ') history:');
-        for (i = 0; i < history.length; i++) {
-          state = state[i];
-          console.log('>>> history entry #' + i);
-          console.log(util.inspect(state, { depth: null }));
-        }
+        console.log('>>> device ' + device.name + ' (' + device.uid + ') history: ' + history.length + ' entries');
       };
     };
 
@@ -61,8 +62,8 @@ new CubesensorsAPI.CubesensorsAPI(clientState).on('error', function(err) {
       console.log('>>> device #' + i);
       console.log(util.inspect(device, { depth: null }));
 
-      this.getDeviceInfo(device.uid, infocb(device))
-          .getDeviceState(device.uid, statecb(device))
+      this.getDeviceInfo(device.uid,    infocb(device))
+          .getDeviceState(device.uid,   statecb(device))
           .getDeviceHistory(device.uid, historycb(device));
     }
   });

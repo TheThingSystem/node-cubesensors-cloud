@@ -22,19 +22,49 @@ API
 
     var CubesensorsAPI = require('cubesensors-cloud');
 
-### Login to cloud
+### Get Authorized Request Tokens
 
-Once you have the consumer key and consumer secret, you now need to generate 
+Once you have the consumer key and consumer secret, you now need to generate a request token.
+With a request token, you can redirect the user to the CubeSensors website,
+where they can login and authorize access.
+The goal is to get two parameters that are needed to use the REST API: oAuthAccessToken,  and oAuthAccessSecret.
+This need be done only once.
 
-    clientState = { clientKey : clientKey, clientSecret : clientSecret };
+The steps are:
+
+1. Create a client with the consumerKey and consumerSecret.
+
+2. Use the authorize method to get the oAuthToken, oAuthTokenSecret, and a redirectURL.
+
+3. Ask the user to go to authorize the application at the redirectURL.
+If so, the CubeSensors website will display the oAuthVerifier.
+
+4. Create a client using the consumerKey, consumerSecret, oAuthToken, oAuthTokenSecret, and oAuthVerifier.
+
+5. Use the authorize method to get the oAuthAccessToken and oAuthAccessSecret.
+
+In other words, you run this code twice, updating the clientState variable each time:
+    
+    var clientState = { consumerKey       : '...'
+                      , consumerSecret    : '...'
+                      , oAuthToken        : null
+                      , oAuthTokenSecret  : null
+                      , oAuthVerifier     : null
+                      , oAuthAccessToken  : null
+                      , oAuthAccessSecret : null
+                      };
 
     var client = new CubesensorsAPI.CubesensorsAPI(clientState).on('error', function(err) {
       console.log('background error: ' + err.message);
-    }).authorize(function(err, state) {
+    }).authorize(function(err, state, redirectURL) {
       if (!!err) return console.log('authorization failed: ' + err.message);
 
-      clientState = state;
-      // securely persist clientState, it has extra parameters
+      if (!!state) clientState = state;
+
+      if (!!redirectURL) {
+        // redirect user to redirectURL
+        // if the user authorizes access, the browser will display the oAuthVerifier code
+      }
     });
 
 
@@ -43,7 +73,15 @@ Once you have the consumer key and consumer secret, you now need to generate
     var util = require('util')
       ;
 
-    client.getDevices(function(err, devices) {
+    var clientState = { consumerKey       : '...'
+                      , consumerSecret    : '...'
+                      , oAuthAccessToken  : '...'
+                      , oAuthAccessSecret : '...'
+                      };
+
+    var client = new CubesensorsAPI.CubesensorsAPI(clientState).on('error', function(err) {
+      console.log('background error: ' + err.message);
+    })..getDevices(function(err, devices) {
       var device, i;
 
       if (!!err) return console.log('getDevices failed: ' + err.message);
@@ -86,8 +124,8 @@ Once you have the consumer key and consumer secret, you now need to generate
         console.log('>>> device #' + i);
         console.log(util.inspect(device, { depth: null }));
 
-        this.getDeviceInfo(device.uid, infocb(device))
-            .getDeviceState(device.uid, statecb(device))
+        this.getDeviceInfo(device.uid,    infocb(device))
+            .getDeviceState(device.uid,   statecb(device))
             .getDeviceHistory(device.uid, historycb(device));
       }
     });

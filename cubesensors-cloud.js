@@ -34,6 +34,9 @@ var CubeSensorsAPI = function(state) {
 
   self.oauth = new oauth.OAuth(self.state.baseURL + '/auth/request_token', self.state.baseURL + '/auth/access_token',
                                self.state.consumerKey, self.state.consumerSecret, '1.0', 'oob', 'HMAC-SHA1');
+  self.oauth.setClientOptions({ requestTokenHttpMethod: 'GET'
+                              , accessTokenHttpMethod:  'GET'
+                              });
 };
 util.inherits(CubeSensorsAPI, events.EventEmitter);
 
@@ -41,32 +44,34 @@ util.inherits(CubeSensorsAPI, events.EventEmitter);
 CubeSensorsAPI.prototype.authorize = function(callback) {
   var self = this;
 
+  if ((typeof self.state.oAuthAccessToken === 'string') && (typeof self.state.oAuthAccessSecret === 'string')) {
+    setTimeout(callback.bind(self), 0);
+    return self;
+  }
+
   if (typeof callback !== 'function') throw new Error('callback is mandatory for authorize');
 
-  var getAccessToken = function() {
-    self.oauth.getOAuthAccessToken(function(err, oAuthAccessToken, oAuthAccessTokenSecret, results) {
-      if (!!err) return callback(err);
-console.log('>>> getOAuthAccessToken'); console.log(util.inspect(results, { depth: null }));
+  if ((typeof self.state.oAuthToken === 'string') && (typeof self.state.oAuthTokenSecret === 'string')) {
+    self.oauth.getOAuthAccessToken(self.state.oAuthToken, self.state.oAuthTokenSecret, self.state.oAuthVerifier,
+                                   function(err, oAuthAccessToken, oAuthAccessTokenSecret, results) {/* jshint unused: false */
+      if (!!err) return callback(data2err(err));
 
       self.state.oAuthAccessToken = oAuthAccessToken;
-      self.state.oauthAccessSecret = oAuthAccessTokenSecret;
+      self.state.oAuthAccessSecret = oAuthAccessTokenSecret;
 
       callback(null, self.state);
     });
 
     return self;
-  };
+  }
 
-  if ((!!self.state.oAuthToken) && (!!self.state.oAuthTokenSecret)) return getAccessToken();
-
-  self.oauth.getOAuthRequestToken(function(err, oAuthToken, oAuthTokenSecret, results) {
-    if (!!err) return callback(err);
-console.log('>>> getOAuthRequestToken'); console.log(util.inspect(results, { depth: null }));
+  self.oauth.getOAuthRequestToken(function(err, oAuthToken, oAuthTokenSecret, results) {/* jshint unused: false */
+    if (!!err) return callback(data2err(err));
 
     self.state.oAuthToken = oAuthToken;
     self.state.oAuthTokenSecret = oAuthTokenSecret;
 
-    getAccessToken();
+    callback(null, self.state, self.state.baseURL + '/auth/authorize?oauth_token=' + oAuthToken);
   });
 
   return self;
@@ -74,6 +79,8 @@ console.log('>>> getOAuthRequestToken'); console.log(util.inspect(results, { dep
 
 
 CubeSensorsAPI.prototype.getDevices = function(callback) {
+  callback = callback.bind(this);
+
   return this.roundtrip('GET', 'devices/', null, function(err, data) {
     var devices, i;
 
@@ -88,7 +95,9 @@ CubeSensorsAPI.prototype.getDevices = function(callback) {
 };
 
 CubeSensorsAPI.prototype.getDeviceInfo = function(deviceID, callback) {
-  return this.roundtrip('GET', 'devices/', null, function(err, data) {
+  callback = callback.bind(this);
+
+  return this.roundtrip('GET', 'devices/' + deviceID, null, function(err, data) {
     if (!!err) return callback(err);
     if (!data) return callback(new Error('no data'));
     if (!data.device) return callback(new Error('no such device: ' + deviceID));
@@ -100,12 +109,14 @@ CubeSensorsAPI.prototype.getDeviceInfo = function(deviceID, callback) {
 var normalizeInfo = function(device) {
   var prop;
 
-  for (prop in device.extra) if ((device.extra.hasOwnProperty(prop)) && (!!device[prop])) device[prop] = device.extra[prop];
+  for (prop in device.extra) if ((device.extra.hasOwnProperty(prop)) && (!device[prop])) device[prop] = device.extra[prop];
 
   return device;
 };
 
 CubeSensorsAPI.prototype.getDeviceState = function(deviceID, callback) {
+  callback = callback.bind(this);
+
   return this.roundtrip('GET', 'devices/' + deviceID + '/current', null, function(err, data) {
     if (!!err) return callback(err);
     if (!data) return callback(new Error('no data'));
@@ -113,7 +124,8 @@ CubeSensorsAPI.prototype.getDeviceState = function(deviceID, callback) {
     if (data.results.length < 1) return callback(null, null);
     if (!util.isArray(data.field_list)) return callback(new Error('no decoder ring (aka field_list)'));
 
-    return normalizeState(data.field_list, data.results[0]);
+console.log(util.inspect(data, { depth: null }));
+    callback(null, normalizeState(data.field_list, data.results[0]));
   });
 };
 
@@ -129,6 +141,7 @@ CubeSensorsAPI.prototype.getDeviceHistory = function(deviceID, starting, ending,
       starting = null;
     }
   }
+  callback = callback.bind(this);
 
 // http://javascriptweblog.wordpress.com/2011/08/08/fixing-the-javascript-typeof-operator/
   var toType = function(obj) { return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase(); };
@@ -149,7 +162,7 @@ CubeSensorsAPI.prototype.getDeviceHistory = function(deviceID, starting, ending,
   if (!!ending)   params.end   = param2iso('ending',   starting);
   params = ((!!params.start) || (!!params.end)) ? ('?' + querystring.stringify(params)) : '';
 
-  return this.roundtrip('GET', 'devices/' + deviceID + '/history' + params, null, function(err, data) {
+  return this.roundtrip('GET', 'devices/' + deviceID + '/span' + params, null, function(err, data) {
     var history, i;
 
     if (!!err) return callback(err);
@@ -162,7 +175,7 @@ CubeSensorsAPI.prototype.getDeviceHistory = function(deviceID, starting, ending,
     for (i = 0; i < data.results.length; i++) history.push(normalizeState(data.field_list, data.results[i]));
     history.sort(function(a, b) { return a.timestamp - b.timestamp; });
 
-    return callback(null, history);
+    callback(null, history);
   });
 };
 
@@ -173,7 +186,7 @@ var normalizeState = function(fields, state) {
 
   i = fields.length;
   if (i > state.length) i = state.length;
-  for (; i >= 0; i--) {
+  for (i--; i >= 0; i--) {
     prop = fields[i];
     prop = { time: 'lastSample', temp: 'temperature', battery: 'batteryLevel' }[prop] || prop;
 
@@ -181,7 +194,7 @@ var normalizeState = function(fields, state) {
     if (prop === 'lastSample') {
       value = new Date(state[i]).getTime();
       if (isNaN(value)) value = state[i];
-    }
+    } else if (prop === 'temperature') value = value / 100;
 
     result[prop] = value;
   }
@@ -207,6 +220,7 @@ CubeSensorsAPI.prototype.roundtrip = function(method, path, json, callback) {
   });
 };
 
+
 CubeSensorsAPI.prototype.invoke = function(method, path, json, callback) {
   var self = this;
 
@@ -219,7 +233,7 @@ CubeSensorsAPI.prototype.invoke = function(method, path, json, callback) {
       if (!!err) self.logger.error('invoke', { exception: err }); else self.logger.info(path, { data: data });
     };
   }
-  if ((!self.state.oAuthAccessToken) || (!self.state.oAuthAccessTokenSecret)) {
+  if ((typeof self.state.oAuthAccessToken !== 'string') || (typeof self.state.oAuthAccessSecret !== 'string')) {
     return callback(new Error('you must call authorize before roundtrip/invoke', 400));
   }
 
@@ -227,11 +241,8 @@ CubeSensorsAPI.prototype.invoke = function(method, path, json, callback) {
     return callback(new Error('GET-without-payload supported only by CubeSensors API'), 405);
   }
 
-console.log('>>> invoke ' + self.state.baseURL + '/v1/' + path);
-
-  self.oauth2._request(method, self.state.baseURL + '/v1/' + path, 'GET', self.state.oAuthAccessToken,
-                       self.state.oAuthAccessTokenSecret, function(oops, body, response) {
-console.log('<<< ' + (response && response.statusCode) + 'oops='+util.inspect(oops, { depth: null })+ ' body='+body);
+  self.oauth.getProtectedResource(self.state.baseURL + '/v1/' + path, method, self.state.oAuthAccessToken,
+                       self.state.oAuthAccessSecret, function(oops, body, response) {
       var expected = { GET    : [ 200 ]
                      , PUT    : [ 200 ]
                      , POST   : [ 200, 201, 202 ]
@@ -240,7 +251,7 @@ console.log('<<< ' + (response && response.statusCode) + 'oops='+util.inspect(oo
 
       var data = {};
 
-      if (!!oops) return callback(new Error(oops.data), oops.statusCode);
+      if (!!oops) return callback(data2err(oops));
 
       try { data = JSON.parse(body); } catch(ex) {
         self.logger.error(path, { event: 'json', diagnostic: ex.message, body: body });
@@ -253,10 +264,18 @@ console.log('<<< ' + (response && response.statusCode) + 'oops='+util.inspect(oo
       }
 
       callback(null, response.statusCode, data);
-
   });
 
   return self;
+};
+
+
+var data2err = function(err) {
+  var data = err.data;
+
+  if (!data) return err;
+  if (typeof data === 'string') { try { data = JSON.parse(data); } catch(ex) {} }
+  return new Error((util.isArray(data.errors)) && (data.errors.length > 0) ? data.errors[0] : err.data);
 };
 
 
