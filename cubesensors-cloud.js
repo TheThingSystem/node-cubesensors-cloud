@@ -16,14 +16,16 @@ var DEFAULT_LOGGER = { error   : function(msg, props) { console.log(msg); if (!!
                      };
 
 
-var CubeSensorsAPI = function(state) {
+var CubeSensorsAPI = function(options) {
   var k;
 
   var self = this;
 
-  if (!(self instanceof CubeSensorsAPI)) return new CubeSensorsAPI(state);
+  if (!(self instanceof CubeSensorsAPI)) return new CubeSensorsAPI(options);
 
-  self.state = state;
+  self.state = {};
+  for (k in options) if ((options.hasOwnProperty(k)) && (toType(options[k]) !== 'null')) self.state[k] = options[k];
+
   if ((!self.state.consumerKey) || (!self.state.consumerSecret)) throw new Error('consumerKey and consumerSecret required');
   if (!self.state.baseURL) self.state.baseURL = 'http://api.cubesensors.com';
 
@@ -124,7 +126,6 @@ CubeSensorsAPI.prototype.getDeviceState = function(deviceID, callback) {
     if (data.results.length < 1) return callback(null, null);
     if (!util.isArray(data.field_list)) return callback(new Error('no decoder ring (aka field_list)'));
 
-console.log(util.inspect(data, { depth: null }));
     callback(null, normalizeState(data.field_list, data.results[0]));
   });
 };
@@ -142,9 +143,6 @@ CubeSensorsAPI.prototype.getDeviceHistory = function(deviceID, starting, ending,
     }
   }
   callback = callback.bind(this);
-
-// http://javascriptweblog.wordpress.com/2011/08/08/fixing-the-javascript-typeof-operator/
-  var toType = function(obj) { return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase(); };
 
   var param2iso = function(param, value) {
     if (toType(value) !== 'date') {
@@ -277,6 +275,9 @@ var data2err = function(err) {
   if (typeof data === 'string') { try { data = JSON.parse(data); } catch(ex) {} }
   return new Error((util.isArray(data.errors)) && (data.errors.length > 0) ? data.errors[0] : err.data);
 };
+
+// http://javascriptweblog.wordpress.com/2011/08/08/fixing-the-javascript-typeof-operator/
+var toType = function(obj) { return ({}).toString.call(obj).match(/\s([a-zA-Z]+)/)[1].toLowerCase(); };
 
 
 exports.CubeSensorsAPI = CubeSensorsAPI;
