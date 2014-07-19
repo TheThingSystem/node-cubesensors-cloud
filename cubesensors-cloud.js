@@ -150,14 +150,14 @@ CubeSensorsAPI.prototype.getDeviceHistory = function(deviceID, starting, ending,
       if (isNaN(value)) throw new Error(param + ': not a number');
       value = new Date(value);
     }
-    value.setMillseconds(0);
 
-    return value.toISOString(value);
+// replace "....xxxZ" with "Z"
+    return (value.toISOString(value).slice(0, -5) + 'Z');
   };
 
   params = {};
   if (!!starting) params.start = param2iso('starting', starting);
-  if (!!ending)   params.end   = param2iso('ending',   starting);
+  if (!!ending)   params.end   = param2iso('ending',   ending);
   params = ((!!params.start) || (!!params.end)) ? ('?' + querystring.stringify(params)) : '';
 
   return this.roundtrip('GET', 'devices/' + deviceID + '/span' + params, null, function(err, data) {

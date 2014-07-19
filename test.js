@@ -27,7 +27,7 @@ new CubeSensorsAPI.CubeSensorsAPI(clientState).on('error', function(err) {
   }
 
   this.getDevices(function(err, devices) {
-    var device, i;
+    var device, i, then;
 
     if (!!err) return console.log('getDevices failed: ' + err.message);
 
@@ -51,20 +51,28 @@ new CubeSensorsAPI.CubeSensorsAPI(clientState).on('error', function(err) {
 
     var historycb = function(device) {
       return function(err, history) {
+        var i, state;
+
         if (!!err) return console.log('getDeviceHistory ' + device.uid + ' failed: ' + err.message);
 
         console.log('>>> device ' + device.name + ' (' + device.uid + ') history: ' + history.length + ' entries');
+        for (i = 0; i < history.length; i++) {
+          state = history[i];
+          console.log('>>> history entry #' + i);
+          console.log(util.inspect(state, { depth: null }));
+        }
       };
     };
 
+    then = new Date().getTime() - (6 * 60 * 1000);
     for (i = 0; i < devices.length; i++) {
       device = devices[i];
       console.log('>>> device #' + i);
       console.log(util.inspect(device, { depth: null }));
 
-      this.getDeviceInfo(device.uid,    infocb(device))
-          .getDeviceState(device.uid,   statecb(device))
-          .getDeviceHistory(device.uid, historycb(device));
+      this.getDeviceInfo(device.uid, infocb(device))
+          .getDeviceState(device.uid, statecb(device))
+          .getDeviceHistory(device.uid, then, undefined, historycb(device));
     }
   });
 });
