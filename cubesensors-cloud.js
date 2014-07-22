@@ -46,8 +46,9 @@ util.inherits(CubeSensorsAPI, events.EventEmitter);
 CubeSensorsAPI.prototype.authorize = function(callback) {
   var self = this;
 
+  callback = callback.bind(self);
   if ((typeof self.state.oAuthAccessToken === 'string') && (typeof self.state.oAuthAccessSecret === 'string')) {
-    setTimeout(callback.bind(self), 0);
+    setTimeout(callback, 0);
     return self;
   }
 
